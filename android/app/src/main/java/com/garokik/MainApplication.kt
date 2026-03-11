@@ -1,4 +1,4 @@
-package com.fabricgsm
+package com.garokik.gsmfabriccal
 
 import android.app.Application
 import com.facebook.react.PackageList

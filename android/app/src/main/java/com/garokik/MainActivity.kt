@@ -1,4 +1,4 @@
-package com.fabricgsm
+package com.garokik.gsmfabriccal
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate
