@@ -2,762 +2,576 @@ import React, { useState, useRef } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, StatusBar, Alert,
-  Animated, Keyboard, Share,
+  Animated, Keyboard, Share, Platform, SafeAreaView,
 } from 'react-native';
 
-// ─── Design Tokens ────────────────────────────────────────────────────────────
-const C = {
-  pageBg:        '#F1F5F9',
-  cardBg:        '#FFFFFF',
-  navy:          '#0F172A',
-  navyMid:       '#1E293B',
-  navyLight:     '#334155',
-  amber:         '#F59E0B',
-  textPrimary:   '#0F172A',
-  textSecondary: '#475569',
-  textMuted:     '#94A3B8',
-  textWhite:     '#F8FAFC',
-  inputBorder:   '#E2E8F0',
-  inputBg:       '#F8FAFC',
-  btnPrimary:    '#0F172A',
-  btnCopy:       '#1E293B',
-  btnReset:      '#FEF2F2',
-  btnResetText:  '#EF4444',
-  btnResetBorder:'#FECACA',
-  catUltraLight: '#60A5FA',
-  catLight:      '#34D399',
-  catMedLight:   '#A78BFA',
-  catMedium:     '#FBBF24',
-  catHeavy:      '#F97316',
-  catVeryHeavy:  '#EF4444',
+const BASE       = '#0B132B';
+const BASE_DARK  = '#050A18';
+const BASE_LIGHT = '#1C2541';
+
+const T = {
+  base: BASE, baseDark: BASE_DARK, baseLight: BASE_LIGHT,
+  ink: '#F8FAFC', inkMid: '#E2E8F0', inkSoft: '#94A3B8', inkGhost: '#64748B',
+  indigo: '#38BDF8', indigoBg: '#0369A130',
+  rose:   '#34D399', roseBg:   '#065F4630',
+  emerald:'#C084FC', emeraldBg:'#6B21A830',
+  b1:'#38BDF8', b2:'#34D399', b3:'#A855F7',
+  b4:'#FBBF24', b5:'#FB923C', b6:'#F43F5E',
 };
 
-// ─── Category Config ──────────────────────────────────────────────────────────
-type GSMCategory = { label: string; use: string; abbr: string; color: string; bg: string };
-
-const getGSMCategory = (gsm: number): GSMCategory => {
-  if (gsm < 100)  return { label: 'Ultra Light', abbr: 'UL', use: 'Georgette, Chiffon, Voile',      color: C.catUltraLight, bg: '#EFF6FF' };
-  if (gsm < 150)  return { label: 'Light',        abbr: 'L',  use: 'Sarees, Summer Shirts, Linings', color: C.catLight,      bg: '#ECFDF5' };
-  if (gsm < 200)  return { label: 'Medium Light', abbr: 'ML', use: 'Dress Shirts, Kurtas, Blouses',  color: C.catMedLight,   bg: '#F5F3FF' };
-  if (gsm < 250)  return { label: 'Medium',       abbr: 'M',  use: 'Trousers, Jackets, Bed Sheets',  color: C.catMedium,     bg: '#FFFBEB' };
-  if (gsm < 350)  return { label: 'Heavy',        abbr: 'H',  use: 'Denim, Canvas, Upholstery',      color: C.catHeavy,      bg: '#FFF7ED' };
-  return           { label: 'Very Heavy', abbr: 'VH', use: 'Industrial Fabric, Thick Canvas',  color: C.catVeryHeavy,  bg: '#FEF2F2' };
+const neu = (depth = 6) => ({
+  shadowColor:  BASE_DARK,
+  shadowOffset: { width: depth, height: depth },
+  shadowOpacity: 0.9,
+  shadowRadius:  depth * 1.5,
+  elevation:     depth,
+});
+const neuInset = {
+  backgroundColor: BASE,
+  shadowColor:     BASE_DARK,
+  shadowOffset:    { width: 2, height: 2 },
+  shadowOpacity:   0.8,
+  shadowRadius:    4,
+  elevation:       0,
 };
 
-// ─── Scale Bar ────────────────────────────────────────────────────────────────
-const ScaleBar = ({ gsm }: { gsm: number }) => {
-  const pct = Math.min((gsm / 500) * 100, 100);
-  return (
-    <View style={sb.wrapper}>
-      <View style={sb.track}>
-        <View style={[sb.fill, { width: `${pct}%` as any }]} />
-        <View style={[sb.thumb, { left: `${pct}%` as any }]} />
-      </View>
-      <View style={sb.ticks}>
-        {['0', '100', '200', '350', '500+'].map(t => (
-          <Text key={t} style={sb.tick}>{t}</Text>
-        ))}
-      </View>
-    </View>
-  );
+type Cat = { label: string; abbr: string; use: string; color: string; bg: string };
+const getCat = (g: number): Cat => {
+  if (g < 100) return { label:'Ultra Light', abbr:'UL', use:'Chiffon, Georgette, Voile',      color:T.b1, bg:'#0284C730' };
+  if (g < 150) return { label:'Light',        abbr:'L',  use:'Sarees, Summer Shirts, Linings', color:T.b2, bg:'#05966930' };
+  if (g < 200) return { label:'Medium Light', abbr:'ML', use:'Dress Shirts, Kurtas, Blouses',  color:T.b3, bg:'#7C3AED30' };
+  if (g < 250) return { label:'Medium',       abbr:'M',  use:'Trousers, Jackets, Bed Sheets',  color:T.b4, bg:'#D9770630' };
+  if (g < 350) return { label:'Heavy',        abbr:'H',  use:'Denim, Canvas, Upholstery',      color:T.b5, bg:'#EA580C30' };
+  return         { label:'Very Heavy', abbr:'VH', use:'Industrial, Thick Canvas',       color:T.b6, bg:'#E11D4830' };
 };
 
-const sb = StyleSheet.create({
-  wrapper: { marginTop: 16, paddingHorizontal: 20 },
-  track:   { height: 8, backgroundColor: C.inputBorder, borderRadius: 99, position: 'relative' },
-  fill:    { height: 8, backgroundColor: C.amber, borderRadius: 99, position: 'absolute', left: 0 },
-  thumb:   {
-    width: 18, height: 18, borderRadius: 99,
-    backgroundColor: C.amber, position: 'absolute', top: -5, marginLeft: -9,
-    borderWidth: 3, borderColor: C.cardBg,
-    elevation: 4, shadowColor: C.amber, shadowOpacity: 0.5, shadowRadius: 4,
+type Mode = 'cost' | 'gsm';
+const TABS: { key: Mode; label: string; icon: string; accent: string }[] = [
+  { key:'cost', label:'Cost',     icon:'◉', accent:T.emerald },
+  { key:'gsm',  label:'GSM Calc', icon:'◈', accent:T.indigo  },
+];
+
+// ─── NEU CARD ──────────────────────────────────────────────────────────────────
+const NeuCard = ({ children, style }: { children: React.ReactNode; style?: any }) => (
+  <View style={[nc.card, style]}>{children}</View>
+);
+const nc = StyleSheet.create({
+  card: {
+    backgroundColor: BASE_LIGHT,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    ...neu(8),
   },
-  ticks: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
-  tick:  { fontSize: 10, color: C.textMuted },
 });
 
-// ─── Input Field ──────────────────────────────────────────────────────────────
-const FIELD_PV = 16;
-const FIELD_FS = 16;
-const FIELD_LH = FIELD_FS * 1.25;
-
-type IFProps = {
-  label: string; unit: string; placeholder: string;
+// ─── INPUT ─────────────────────────────────────────────────────────────────────
+type NIPProps = {
+  label: string; placeholder: string;
   value: string; onChangeText: (t: string) => void;
-  optional?: boolean;
+  unitLabel: string; accent: string; optional?: boolean;
 };
-
-const InputField = ({ label, unit, placeholder, value, onChangeText, optional }: IFProps) => (
-  <View style={f.wrapper}>
-    <View style={f.labelRow}>
-      <Text style={f.label}>{label}</Text>
-      {optional && <Text style={f.optionalTag}>OPTIONAL</Text>}
+const NeuInput = ({ label, placeholder, value, onChangeText, unitLabel, accent, optional }: NIPProps) => (
+  <View style={ni.wrap}>
+    <View style={ni.labelRow}>
+      <Text style={ni.label}>{label}</Text>
+      {optional && (
+        <View style={[ni.optBadge, { backgroundColor: accent + '25', borderColor: accent + '50' }]}>
+          <Text style={[ni.optText, { color: accent }]}>optional</Text>
+        </View>
+      )}
     </View>
-    <View style={f.row}>
+    <View style={[ni.pill, neuInset]}>
       <TextInput
-        style={f.input}
+        style={ni.input}
         placeholder={placeholder}
         keyboardType="decimal-pad"
         value={value}
         onChangeText={onChangeText}
-        placeholderTextColor={C.inputBorder}
+        placeholderTextColor={T.inkGhost}
+        selectionColor={accent}
       />
-      <View style={f.badge}>
-        <Text style={f.badgeText}>{unit}</Text>
+      <View style={[ni.unitBubble, { backgroundColor: accent }]}>
+        <Text style={ni.unitText}>{unitLabel}</Text>
       </View>
     </View>
   </View>
 );
-
-const f = StyleSheet.create({
-  wrapper:     { marginBottom: 16 },
-  labelRow:    { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  label:       { fontSize: 11, fontWeight: '700', color: C.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 },
-  optionalTag: { marginLeft: 8, fontSize: 9, fontWeight: '700', color: C.amber, letterSpacing: 0.5, backgroundColor: '#FFFBEB', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  row:         { flexDirection: 'row', alignItems: 'stretch' },
-  input:       {
-    flex: 1, borderWidth: 1.5, borderColor: C.inputBorder, borderRightWidth: 0,
-    borderTopLeftRadius: 10, borderBottomLeftRadius: 10,
-    paddingHorizontal: 14, paddingVertical: FIELD_PV,
-    fontSize: FIELD_FS, lineHeight: FIELD_LH,
-    color: C.textPrimary, backgroundColor: C.inputBg,
-  },
-  badge: {
-    backgroundColor: C.navyLight, paddingHorizontal: 18, paddingVertical: FIELD_PV,
-    borderTopRightRadius: 10, borderBottomRightRadius: 10,
-    alignItems: 'center', justifyContent: 'center', minWidth: 52,
-  },
-  badgeText: { color: C.amber, fontWeight: '800', fontSize: 13, lineHeight: FIELD_LH, textTransform: 'uppercase' },
+const ni = StyleSheet.create({
+  wrap:       { marginBottom: 14 },
+  labelRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingHorizontal: 2 },
+  label:      { fontSize: 11, fontWeight: '700', color: T.inkSoft, letterSpacing: 0.9, textTransform: 'uppercase' },
+  optBadge:   { marginLeft: 8, borderRadius: 99, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 2 },
+  optText:    { fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
+  pill:       { flexDirection: 'row', alignItems: 'stretch', borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  input:      { flex: 1, fontSize: 16, fontWeight: '600', color: T.ink, paddingVertical: 14, paddingHorizontal: 16 },
+  unitBubble: { paddingHorizontal: 18, alignItems: 'center', justifyContent: 'center', minWidth: 62 },
+  unitText:   { color: '#0B132B', fontWeight: '900', fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase' },
 });
 
-// ─── Reusable Result Block ────────────────────────────────────────────────────
-type ResultBlockProps = {
-  label: string; value: string; unit?: string;
-  accentColor?: string; fadeAnim: Animated.Value;
-  onShare: () => void; onReset: () => void;
-  children?: React.ReactNode;
-};
-
-const ResultBlock = ({ label, value, unit, accentColor = C.amber, fadeAnim, onShare, onReset, children }: ResultBlockProps) => (
-  <Animated.View style={[s.resultCard, { opacity: fadeAnim }]}>
-    <View style={[s.resultAccent, { backgroundColor: accentColor }]} />
-    <View style={{ padding: 20 }}>
-      <Text style={s.gsmMeta}>{label}</Text>
-      <Text style={s.gsmValue}>{value}<Text style={s.gsmUnit}>{unit ? ` ${unit}` : ''}</Text></Text>
-      {children}
-      <View style={s.actionRow}>
-        <TouchableOpacity style={s.copyBtn} onPress={onShare} activeOpacity={0.8}>
-          <Text style={s.copyBtnText}>Share Result</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.resetBtn} onPress={onReset} activeOpacity={0.8}>
-          <Text style={s.resetBtnText}>Reset</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  </Animated.View>
+// ─── ACTION BUTTON ─────────────────────────────────────────────────────────────
+const ActionBtn = ({ label, accent, onPress }: { label: string; accent: string; onPress: () => void }) => (
+  <TouchableOpacity
+    style={[ab.btn, { backgroundColor: accent }, neu(4)]}
+    onPress={onPress}
+    activeOpacity={0.85}>
+    <Text style={ab.text}>{label}</Text>
+  </TouchableOpacity>
 );
+const ab = StyleSheet.create({
+  btn:  { borderRadius: 16, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  text: { color: '#0B132B', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
+});
 
-// ─── Mode Type ────────────────────────────────────────────────────────────────
-type Mode = 'gsm' | 'reverse' | 'cost' | 'convert';
-
-const MODES: { key: Mode; label: string }[] = [
-  { key: 'gsm',     label: 'GSM'     },
-  { key: 'reverse', label: 'Reverse' },
-  { key: 'cost',    label: 'Cost'    },
-  { key: 'convert', label: 'Convert' },
-];
-
-// ─── App ──────────────────────────────────────────────────────────────────────
-export default function App() {
-  const [mode, setMode] = useState<Mode>('gsm');
-
-  // GSM mode
-  const [weight, setWeight] = useState('');
-  const [length, setLength] = useState('');
-  const [width,  setWidth]  = useState('');
-  const [result, setResult] = useState<number | null>(null);
-  const fadeGSM = useRef(new Animated.Value(0)).current;
-
-  // Reverse mode
-  const [revGSM,     setRevGSM]     = useState('');
-  const [revWeight,  setRevWeight]  = useState('');
-  const [revLen,     setRevLen]     = useState('');
-  const [revWid,     setRevWid]     = useState('');
-  const [revResult,  setRevResult]  = useState<string | null>(null);
-  const [revMissing, setRevMissing] = useState<'length' | 'width' | null>(null);
-  const fadeRev = useRef(new Animated.Value(0)).current;
-
-  // Cost mode
-  const [costGSM,     setCostGSM]     = useState('');
-  const [costWidth,   setCostWidth]   = useState('');
-  const [costPriceKg, setCostPriceKg] = useState('');
-  const [costResult,  setCostResult]  = useState<{ perMeter: number; perYard: number } | null>(null);
-  const fadeCost = useRef(new Animated.Value(0)).current;
-
-  // Convert mode
-  const [convValue,  setConvValue]  = useState('');
-  const [convType,   setConvType]   = useState<'m2y' | 'y2m' | 'gsm2oys' | 'oys2gsm'>('m2y');
-  const [convResult, setConvResult] = useState<string | null>(null);
-  const fadeConv = useRef(new Animated.Value(0)).current;
-
-  const animate = (anim: Animated.Value) => {
-    anim.setValue(0);
-    Animated.timing(anim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-  };
-
-  const switchMode = (m: Mode) => {
-    setMode(m);
-    setWeight(''); setLength(''); setWidth(''); setResult(null);
-    setRevGSM(''); setRevWeight(''); setRevLen(''); setRevWid(''); setRevResult(null); setRevMissing(null);
-    setCostGSM(''); setCostWidth(''); setCostPriceKg(''); setCostResult(null);
-    setConvValue(''); setConvResult(null);
-  };
-
-  // ── GSM ───────────────────────────────────────────────────────────────────
-  const calcGSM = () => {
-    Keyboard.dismiss();
-    const w = parseFloat(weight), l = parseFloat(length), wd = parseFloat(width);
-    if (!w || !l || !wd || w <= 0 || l <= 0 || wd <= 0) {
-      Alert.alert('Invalid Input', 'Please enter valid positive numbers for all fields.');
-      return;
-    }
-    setResult(Math.round((w / (l * wd)) * 100) / 100);
-    animate(fadeGSM);
-  };
-
-  const resetGSM = () => { setWeight(''); setLength(''); setWidth(''); setResult(null); };
-
-  const shareGSM = async () => {
-    if (result === null) return;
-    const cat = getGSMCategory(result);
-    await Share.share({
-      message:
-`📐 Fabric GSM Result
-━━━━━━━━━━━━━━━━━━━━
-GSM Value : ${result} g/m²
-Category  : ${cat.label}
-Best For  : ${cat.use}
-━━━━━━━━━━━━━━━━━━━━
-Weight: ${weight}g | Length: ${length}m | Width: ${width}m
-— Fabric GSM Calculator`,
-    });
-  };
-
-  // ── Reverse ───────────────────────────────────────────────────────────────
-  const calcReverse = () => {
-    Keyboard.dismiss();
-    const gsm = parseFloat(revGSM);
-    const w   = parseFloat(revWeight);
-    const l   = parseFloat(revLen);
-    const wd  = parseFloat(revWid);
-
-    if (!gsm || gsm <= 0 || !w || w <= 0) {
-      Alert.alert('Invalid Input', 'Target GSM and Fabric Weight are required.');
-      return;
-    }
-    const hasL = !isNaN(l) && l > 0;
-    const hasW = !isNaN(wd) && wd > 0;
-
-    if (hasL && hasW) {
-      Alert.alert('Leave one empty', 'Leave either Length or Width empty to calculate the missing dimension.');
-      return;
-    }
-    if (!hasL && !hasW) {
-      Alert.alert('Invalid Input', 'Enter at least one dimension (Length or Width).');
-      return;
-    }
-    if (hasL) {
-      setRevMissing('width');
-      setRevResult(`${Math.round((w / (gsm * l)) * 100) / 100} m`);
-    } else {
-      setRevMissing('length');
-      setRevResult(`${Math.round((w / (gsm * wd)) * 100) / 100} m`);
-    }
-    animate(fadeRev);
-  };
-
-  const resetReverse = () => {
-    setRevGSM(''); setRevWeight(''); setRevLen(''); setRevWid('');
-    setRevResult(null); setRevMissing(null);
-  };
-
-  const shareReverse = async () => {
-    if (!revResult) return;
-    await Share.share({
-      message:
-`📐 Fabric GSM Reverse Calc
-━━━━━━━━━━━━━━━━━━━━
-Target GSM : ${revGSM} g/m²
-Weight     : ${revWeight} g
-${revMissing === 'width'
-  ? `Length     : ${revLen} m\nCalc Width : ${revResult}`
-  : `Width      : ${revWid} m\nCalc Length: ${revResult}`}
-— Fabric GSM Calculator`,
-    });
-  };
-
-  // ── Cost ──────────────────────────────────────────────────────────────────
-  // Cost per linear meter = (GSM × Width × Price/kg) ÷ 1000
-  // Cost per linear yard  = Cost/meter × 0.9144
-  const calcCost = () => {
-    Keyboard.dismiss();
-    const gsm   = parseFloat(costGSM);
-    const w     = parseFloat(costWidth);
-    const price = parseFloat(costPriceKg);
-
-    if (!gsm || !w || !price || gsm <= 0 || w <= 0 || price <= 0) {
-      Alert.alert('Invalid Input', 'Please enter valid positive values for all fields.');
-      return;
-    }
-    const perMeter = Math.round(((gsm * w * price) / 1000) * 100) / 100;
-    const perYard  = Math.round(perMeter * 0.9144 * 100) / 100;
-    setCostResult({ perMeter, perYard });
-    animate(fadeCost);
-  };
-
-  const resetCost = () => { setCostGSM(''); setCostWidth(''); setCostPriceKg(''); setCostResult(null); };
-
-  const shareCost = async () => {
-    if (!costResult) return;
-    await Share.share({
-      message:
-`💰 Fabric Cost Result
-━━━━━━━━━━━━━━━━━━━━
-GSM          : ${costGSM} g/m²
-Width        : ${costWidth} m
-Price/kg     : ₹${costPriceKg}
-━━━━━━━━━━━━━━━━━━━━
-Cost/meter   : ₹${costResult.perMeter}
-Cost/yard    : ₹${costResult.perYard}
-━━━━━━━━━━━━━━━━━━━━
-Note: Cost is per linear meter/yard at entered width.
-— Fabric GSM Calculator`,
-    });
-  };
-
-  // ── Convert ───────────────────────────────────────────────────────────────
-  const CONV_OPTIONS: { key: typeof convType; from: string; to: string; label: string }[] = [
-    { key: 'm2y',     from: 'Meters', to: 'Yards',  label: 'M → Yd'    },
-    { key: 'y2m',     from: 'Yards',  to: 'Meters', label: 'Yd → M'    },
-    { key: 'gsm2oys', from: 'GSM',    to: 'OYS',    label: 'GSM → OYS' },
-    { key: 'oys2gsm', from: 'OYS',    to: 'GSM',    label: 'OYS → GSM' },
-  ];
-
-  const doConvert = () => {
-    Keyboard.dismiss();
-    const v = parseFloat(convValue);
-    if (!v || v <= 0) { Alert.alert('Invalid Input', 'Please enter a valid positive number.'); return; }
-    let res = 0;
-    switch (convType) {
-      case 'm2y':     res = Math.round(v * 1.09361  * 10000) / 10000; break;
-      case 'y2m':     res = Math.round(v * 0.9144   * 10000) / 10000; break;
-      case 'gsm2oys': res = Math.round((v / 33.906) * 10000) / 10000; break;
-      case 'oys2gsm': res = Math.round(v * 33.906   * 10000) / 10000; break;
-    }
-    setConvResult(`${res}`);
-    animate(fadeConv);
-  };
-
-  const resetConv = () => { setConvValue(''); setConvResult(null); };
-
-  const shareConv = async () => {
-    if (!convResult) return;
-    const opt = CONV_OPTIONS.find(o => o.key === convType)!;
-    await Share.share({
-      message:
-`🔄 Textile Unit Conversion
-━━━━━━━━━━━━━━━━━━━━
-${opt.from.padEnd(10)}: ${convValue}
-${opt.to.padEnd(10)}: ${convResult}
-— Fabric GSM Calculator`,
-    });
-  };
-
-  const cat     = result !== null ? getGSMCategory(result) : null;
-  const convOpt = CONV_OPTIONS.find(o => o.key === convType)!;
-
+// ─── SCALE BAR ─────────────────────────────────────────────────────────────────
+const ScaleBar = ({ gsm, color }: { gsm: number; color: string }) => {
+  const pct = Math.min((gsm / 500) * 100, 100);
   return (
-    <ScrollView style={s.page} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <StatusBar backgroundColor={C.navy} barStyle="light-content" />
-
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.iconBox}>
-          <Text style={s.iconText}>GSM</Text>
-        </View>
-        <Text style={s.title}>Fabric GSM</Text>
-        <Text style={s.subtitle}>C A L C U L A T O R</Text>
+    <View style={skb.wrap}>
+      <View style={[skb.track, { backgroundColor: BASE }]}>
+        <View style={[skb.fill, { width: `${pct}%` as any, backgroundColor: color }]} />
+        <View style={[skb.knob, { left: `${pct}%` as any, backgroundColor: color, borderColor: BASE_LIGHT }]} />
       </View>
-
-      {/* Formula Strip */}
-      <View style={s.formulaStrip}>
-        <Text style={s.formulaText}>GSM  =  Weight (g)  ÷  ( Length × Width ) m²</Text>
-      </View>
-
-      {/* Mode Toggle */}
-      <View style={s.modeRow}>
-        {MODES.map(m => (
-          <TouchableOpacity
-            key={m.key}
-            style={[s.modeBtn, mode === m.key && s.modeBtnActive]}
-            onPress={() => switchMode(m.key)}
-            activeOpacity={0.85}>
-            <Text style={[s.modeBtnText, mode === m.key && s.modeBtnTextActive]}>
-              {m.label}
-            </Text>
-          </TouchableOpacity>
+      <View style={skb.labels}>
+        {['0', '100', '200', '350', '500'].map(l => (
+          <Text key={l} style={skb.tick}>{l}</Text>
         ))}
       </View>
+    </View>
+  );
+};
+const skb = StyleSheet.create({
+  wrap:  { marginTop: 16, marginBottom: 4 },
+  track: { height: 8, borderRadius: 99, position: 'relative', overflow: 'visible' },
+  fill:  { height: '100%' as any, borderRadius: 99, position: 'absolute', left: 0 },
+  knob: {
+    width: 20, height: 20, borderRadius: 10,
+    position: 'absolute', top: -6, marginLeft: -10,
+    borderWidth: 3, elevation: 4,
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4,
+  },
+  labels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  tick:   { fontSize: 10, color: T.inkGhost, fontWeight: '600' },
+});
 
-      {/* ══════════════════════════════════════
-          GSM MODE
-      ══════════════════════════════════════ */}
-      {mode === 'gsm' && (
-        <>
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Fabric Details</Text>
-            <InputField label="Fabric Weight" unit="G" placeholder="e.g. 250" value={weight} onChangeText={setWeight} />
-            <InputField label="Fabric Length" unit="M" placeholder="e.g. 1.5" value={length} onChangeText={setLength} />
-            <InputField label="Fabric Width"  unit="M" placeholder="e.g. 1.2" value={width}  onChangeText={setWidth}  />
-            <TouchableOpacity style={s.calcBtn} onPress={calcGSM} activeOpacity={0.85}>
-              <Text style={s.calcBtnText}>Calculate GSM</Text>
-            </TouchableOpacity>
-          </View>
+// ─── STAT TILE ─────────────────────────────────────────────────────────────────
+const StatTile = ({ label, value, accent }: { label: string; value: string; accent: string }) => (
+  <View style={[st.tile, { borderTopColor: accent }, neu(5)]}>
+    <Text style={st.label}>{label}</Text>
+    <Text style={[st.value, { color: accent }]}>{value}</Text>
+  </View>
+);
+const st = StyleSheet.create({
+  tile:  {
+    flex: 1, backgroundColor: BASE, borderRadius: 18,
+    borderTopWidth: 3, borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 14, paddingVertical: 16,
+  },
+  label: { fontSize: 10, fontWeight: '700', color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
+  value: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
+});
 
-          {result !== null && cat && (
-            <Animated.View style={[s.resultCard, { opacity: fadeGSM }]}>
-              <View style={[s.resultAccent, { backgroundColor: cat.color }]} />
-              <View style={s.resultTopRow}>
-                <View>
-                  <Text style={s.gsmMeta}>GSM VALUE</Text>
-                  <Text style={s.gsmValue}>{result}<Text style={s.gsmUnit}> g/m²</Text></Text>
-                </View>
-                <View style={[s.abbrCircle, { backgroundColor: cat.bg, borderColor: cat.color }]}>
-                  <Text style={[s.abbrText, { color: cat.color }]}>{cat.abbr}</Text>
-                </View>
-              </View>
-              <ScaleBar gsm={result} />
-              <View style={s.divider} />
-              <View style={s.chipRow}>
-                <View style={[s.chip, { backgroundColor: cat.bg, borderColor: cat.color }]}>
-                  <Text style={[s.chipText, { color: cat.color }]}>{cat.label}</Text>
-                </View>
-              </View>
-              <Text style={s.useLabel}>Best Suited For</Text>
-              <Text style={s.useText}>{cat.use}</Text>
-              <View style={s.actionRow}>
-                <TouchableOpacity style={s.copyBtn} onPress={shareGSM} activeOpacity={0.8}>
-                  <Text style={s.copyBtnText}>Share Result</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={s.resetBtn} onPress={resetGSM} activeOpacity={0.8}>
-                  <Text style={s.resetBtnText}>Reset</Text>
-                </TouchableOpacity>
-              </View>
-            </Animated.View>
-          )}
+// ─── REF ROW ───────────────────────────────────────────────────────────────────
+const RefRow = ({ range, label, eg, color, alt }: { range: string; label: string; eg: string; color: string; alt: boolean }) => (
+  <View style={[rr.row, alt && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
+    <View style={[rr.dot, { backgroundColor: color }]} />
+    <Text style={[rr.range, { color }]}>{range}</Text>
+    <Text style={rr.label}>{label}</Text>
+    <Text style={rr.eg}>{eg}</Text>
+  </View>
+);
+const rr = StyleSheet.create({
+  row:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderRadius: 10, marginBottom: 2 },
+  dot:   { width: 9, height: 9, borderRadius: 99, marginRight: 12 },
+  range: { width: 74, fontSize: 11, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  label: { flex: 1, fontSize: 12, fontWeight: '700', color: T.ink },
+  eg:    { flex: 1, fontSize: 11, color: T.inkGhost, textAlign: 'right' },
+});
 
-          {/* GSM Reference Table */}
-          <View style={s.refCard}>
-            <Text style={s.refTitle}>GSM Quick Reference</Text>
-            {[
-              { range: '< 100',     label: 'Ultra Light', eg: 'Chiffon, Georgette' },
-              { range: '100 – 149', label: 'Light',        eg: 'Sarees, Linings'   },
-              { range: '150 – 199', label: 'Medium Light', eg: 'Shirts, Kurtas'    },
-              { range: '200 – 249', label: 'Medium',       eg: 'Trousers, Jackets' },
-              { range: '250 – 349', label: 'Heavy',        eg: 'Denim, Canvas'     },
-              { range: '350 +',     label: 'Very Heavy',   eg: 'Industrial Fabric' },
-            ].map((row, i) => (
-              <View key={i} style={[s.refRow, i % 2 === 0 && s.refRowAlt]}>
-                <Text style={s.refRange}>{row.range}</Text>
-                <Text style={s.refLabel}>{row.label}</Text>
-                <Text style={s.refEg}>{row.eg}</Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+// ─── DIVIDER ───────────────────────────────────────────────────────────────────
+const Div = () => <View style={{ height: 1, backgroundColor: 'rgba(255,255,255,0.08)', marginVertical: 16, borderRadius: 1 }} />;
 
-      {/* ══════════════════════════════════════
-          REVERSE MODE
-      ══════════════════════════════════════ */}
-      {mode === 'reverse' && (
-        <>
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Reverse Calculator</Text>
-            <Text style={s.hint}>
-              Enter Target GSM + Weight +{' '}
-              <Text style={s.hintBold}>one dimension only</Text>.{'\n'}
-              Leave the unknown dimension empty — it will be calculated.
-            </Text>
-            <InputField label="Target GSM"    unit="GSM" placeholder="e.g. 200" value={revGSM}    onChangeText={setRevGSM}    />
-            <InputField label="Fabric Weight" unit="G"   placeholder="e.g. 300" value={revWeight} onChangeText={setRevWeight} />
-            <InputField label="Fabric Length" unit="M"   placeholder="e.g. 1.5" value={revLen}    onChangeText={setRevLen}    optional />
-            <InputField label="Fabric Width"  unit="M"   placeholder="e.g. 1.2" value={revWid}    onChangeText={setRevWid}    optional />
-            <TouchableOpacity style={s.calcBtn} onPress={calcReverse} activeOpacity={0.85}>
-              <Text style={s.calcBtnText}>Find Missing Dimension</Text>
-            </TouchableOpacity>
-          </View>
+// ─── BUTTON PAIR ───────────────────────────────────────────────────────────────
+const BtnPair = ({ accent, onShare, onReset }: { accent: string; onShare: () => void; onReset: () => void }) => (
+  <View style={bp.row}>
+    <TouchableOpacity style={[bp.share, { borderColor: accent }]} onPress={onShare} activeOpacity={0.8}>
+      <Text style={[bp.shareText, { color: accent }]}>↑  Share</Text>
+    </TouchableOpacity>
+    <TouchableOpacity style={[bp.reset, neu(3)]} onPress={onReset} activeOpacity={0.8}>
+      <Text style={bp.resetText}>↺  Reset</Text>
+    </TouchableOpacity>
+  </View>
+);
+const bp = StyleSheet.create({
+  row:       { flexDirection: 'row', gap: 12, marginTop: 16 },
+  share:     { flex: 1, borderWidth: 2, borderRadius: 14, paddingVertical: 13, alignItems: 'center', backgroundColor: BASE },
+  shareText: { fontWeight: '800', fontSize: 14 },
+  reset:     { flex: 1, backgroundColor: BASE, borderRadius: 14, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  resetText: { fontSize: 14, fontWeight: '700', color: T.inkSoft },
+});
 
-          {revResult !== null && (
-            <ResultBlock
-              label={revMissing === 'width' ? 'CALCULATED WIDTH' : 'CALCULATED LENGTH'}
-              value={revResult}
-              accentColor={C.amber}
-              fadeAnim={fadeRev}
-              onShare={shareReverse}
-              onReset={resetReverse}>
-              <View style={s.divider} />
-              <Text style={s.useLabel}>What This Means</Text>
-              <Text style={s.useText}>
-                {revMissing === 'width'
-                  ? `To achieve ${revGSM} GSM with ${revWeight}g over ${revLen}m length → width must be ${revResult}.`
-                  : `To achieve ${revGSM} GSM with ${revWeight}g over ${revWid}m width → length must be ${revResult}.`}
-              </Text>
-            </ResultBlock>
-          )}
+// ═══════════════════════════════════════════════════════════════════════════════
+// APP
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function App() {
+  const [mode, setMode] = useState<Mode>('cost');
 
-          <View style={s.refCard}>
-            <Text style={s.refTitle}>Formulas Used</Text>
-            {[
-              { case: 'Find Width',  formula: 'Width  = Weight ÷ (GSM × Length)' },
-              { case: 'Find Length', formula: 'Length = Weight ÷ (GSM × Width)'  },
-            ].map((row, i) => (
-              <View key={i} style={[s.refRow, i % 2 === 0 && s.refRowAlt, { flexDirection: 'column', paddingVertical: 10 }]}>
-                <Text style={[s.refRange, { width: '100%', marginBottom: 4 }]}>{row.case}</Text>
-                <Text style={[s.refLabel, { fontFamily: 'monospace', fontSize: 11 }]}>{row.formula}</Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+  const [wt,  setWt]  = useState('');
+  const [ln,  setLn]  = useState('');
+  const [wd,  setWd]  = useState('');
+  const [gsm, setGsm] = useState<number | null>(null);
+  const fadeG = useRef(new Animated.Value(0)).current;
 
-      {/* ══════════════════════════════════════
-          COST MODE
-      ══════════════════════════════════════ */}
-      {mode === 'cost' && (
-        <>
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Fabric Cost Calculator</Text>
-            <Text style={s.hint}>
-              Enter GSM, fabric width, and price per kg to get{' '}
-              <Text style={s.hintBold}>cost per linear meter and linear yard</Text>.{'\n'}
-              <Text style={s.hintBold}>Assumes:</Text> price is per kg and width is fixed.
-            </Text>
-            <InputField label="Fabric GSM"      unit="GSM" placeholder="e.g. 200" value={costGSM}     onChangeText={setCostGSM}     />
-            <InputField label="Fabric Width"     unit="M"   placeholder="e.g. 1.5" value={costWidth}   onChangeText={setCostWidth}   />
-            <InputField label="Price per kg (₹)" unit="₹"   placeholder="e.g. 350" value={costPriceKg} onChangeText={setCostPriceKg} />
-            <TouchableOpacity style={s.calcBtn} onPress={calcCost} activeOpacity={0.85}>
-              <Text style={s.calcBtnText}>Calculate Cost</Text>
-            </TouchableOpacity>
-          </View>
+  const [cGsm, setCGsm] = useState('');
+  const [cWd,  setCWd]  = useState('');
+  const [cPkg, setCPkg] = useState('');
+  const [cRes, setCRes] = useState<{ m: number; y: number } | null>(null);
+  const fadeC = useRef(new Animated.Value(0)).current;
 
-          {costResult !== null && (
-            <Animated.View style={[s.resultCard, { opacity: fadeCost }]}>
-              <View style={[s.resultAccent, { backgroundColor: C.catLight }]} />
-              <View style={{ padding: 20 }}>
+  const pop = (a: Animated.Value) => {
+    a.setValue(0);
+    Animated.spring(a, { toValue: 1, tension: 60, friction: 8, useNativeDriver: true }).start();
+  };
 
-                <Text style={s.gsmMeta}>COST PER LINEAR METER</Text>
-                <Text style={s.gsmValue}>₹{costResult.perMeter}</Text>
+  const go = (m: Mode) => {
+    setMode(m);
+    setWt(''); setLn(''); setWd(''); setGsm(null);
+    setCGsm(''); setCWd(''); setCPkg(''); setCRes(null);
+  };
 
-                <View style={s.divider} />
+  const doGSM = () => {
+    Keyboard.dismiss();
+    const w = parseFloat(wt), l = parseFloat(ln), d = parseFloat(wd);
+    if (!w || !l || !d || w <= 0 || l <= 0 || d <= 0) {
+      Alert.alert('Missing Data', 'All three fields must have valid positive values.'); return;
+    }
+    setGsm(Math.round((w / (l * d)) * 100) / 100);
+    pop(fadeG);
+  };
+  const resetGSM = () => { setWt(''); setLn(''); setWd(''); setGsm(null); };
+  const shareGSM = async () => {
+    if (gsm === null) return;
+    const c = getCat(gsm);
+    await Share.share({ message: `📐 TexMetrics Pro - GSM: ${gsm} g/m²\nCategory: ${c.label}\nBest Suited For: ${c.use}\nWeight: ${wt}g | Length: ${ln}m | Width: ${wd}m\n— TexMetrics Pro Suite` });
+  };
 
-                <Text style={s.gsmMeta}>COST PER LINEAR YARD</Text>
-                <Text style={[s.gsmValue, { fontSize: 36 }]}>₹{costResult.perYard}</Text>
+  const doCost = () => {
+    Keyboard.dismiss();
+    const g = parseFloat(cGsm), w = parseFloat(cWd), p = parseFloat(cPkg);
+    if (!g || !w || !p || g <= 0 || w <= 0 || p <= 0) {
+      Alert.alert('Missing Data', 'All fields must have valid positive values.'); return;
+    }
+    const m = Math.round(((g * w * p) / 1000) * 100) / 100;
+    setCRes({ m, y: Math.round(m * 0.9144 * 100) / 100 });
+    pop(fadeC);
+  };
+  const resetCost = () => { setCGsm(''); setCWd(''); setCPkg(''); setCRes(null); };
+  const shareCost = async () => {
+    if (!cRes) return;
+    await Share.share({ message: `💰 TexMetrics Pro - Cost Estimate\nGSM: ${cGsm} | Width: ${cWd}m | Price: ₹${cPkg}/kg\nCost/meter: ₹${cRes.m}\nCost/yard: ₹${cRes.y}\n— TexMetrics Pro Suite` });
+  };
 
-                <View style={s.divider} />
+  const cat       = gsm !== null ? getCat(gsm) : null;
+  const activeTab = TABS.find(t => t.key === mode)!;
 
-                <Text style={s.useLabel}>How It Was Calculated</Text>
-                <Text style={s.useText}>
-                  Cost/m = ({costGSM} × {costWidth} × ₹{costPriceKg}) ÷ 1000{'\n'}
-                  Cost/yd = Cost/m × 0.9144
-                </Text>
+  return (
+    <SafeAreaView style={s.root}>
+      <StatusBar backgroundColor={BASE} barStyle="light-content" />
 
-                {/* Assumption Note */}
-                <View style={s.assumptionBox}>
-                  <Text style={s.assumptionTitle}>📌 Assumption</Text>
-                  <Text style={s.assumptionText}>
-                    This cost is calculated for{' '}
-                    <Text style={{ fontWeight: '700' }}>1 linear meter</Text> of fabric at the entered width.
-                    If your supplier quotes price per running meter at a standard width, this result is directly applicable.
-                    Results may vary if pricing structure differs.
-                  </Text>
-                </View>
+      {/* ── HEADER ── */}
+      <View style={s.header}>
+        <View style={[s.headerIcon, { backgroundColor: activeTab.accent }, neu(4)]}>
+          <Text style={s.headerIconText}>{activeTab.icon}</Text>
+        </View>
+        <View style={s.headerTextWrap}>
+          <Text style={s.headerTitle}>TexMetrics Pro</Text>
+          <Text style={[s.headerSub, { color: activeTab.accent }]}>{activeTab.label.toUpperCase()}</Text>
+        </View>
+        <View style={[s.formulaChip, { borderColor: activeTab.accent + '45', backgroundColor: activeTab.accent + '18' }]}>
+          <Text style={[s.formulaChipText, { color: activeTab.accent }]}>{mode === 'cost' ? '₹/m' : 'W÷(L×W)'}</Text>
+        </View>
+      </View>
 
-                <View style={s.actionRow}>
-                  <TouchableOpacity style={s.copyBtn} onPress={shareCost} activeOpacity={0.8}>
-                    <Text style={s.copyBtnText}>Share Result</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={s.resetBtn} onPress={resetCost} activeOpacity={0.8}>
-                    <Text style={s.resetBtnText}>Reset</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Animated.View>
-          )}
+      {/* ── TAB BAR ── */}
+      <View style={s.tabWrap}>
+        <View style={[s.tabBar, neu(6)]}>
+          {TABS.map(tab => {
+            const active = mode === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[
+                  s.tabItem,
+                  active && [s.tabItemActive, { backgroundColor: tab.accent + '22' }, neu(3)],
+                ]}
+                onPress={() => go(tab.key)}
+                activeOpacity={0.8}>
+                <Text style={[s.tabIcon, { color: active ? tab.accent : T.inkGhost }]}>{tab.icon}</Text>
+                <Text style={[s.tabLabel, { color: active ? tab.accent : T.inkGhost }]}>{tab.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
 
-          <View style={s.refCard}>
-            <Text style={s.refTitle}>Cost Formula</Text>
-            {[
-              { case: 'Per Meter', formula: '(GSM × Width × Price/kg) ÷ 1000' },
-              { case: 'Per Yard',  formula: 'Cost/meter × 0.9144'              },
-            ].map((row, i) => (
-              <View key={i} style={[s.refRow, i % 2 === 0 && s.refRowAlt, { flexDirection: 'column', paddingVertical: 10 }]}>
-                <Text style={[s.refRange, { width: '100%', marginBottom: 4 }]}>{row.case}</Text>
-                <Text style={[s.refLabel, { fontFamily: 'monospace', fontSize: 11 }]}>{row.formula}</Text>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+      {/* ── SCROLL ── */}
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}>
 
-      {/* ══════════════════════════════════════
-          CONVERT MODE
-      ══════════════════════════════════════ */}
-      {mode === 'convert' && (
-        <>
-          <View style={s.card}>
-            <Text style={s.cardTitle}>Textile Unit Converter</Text>
-
-            {/* Conversion type picker */}
-            <View style={s.convTypeRow}>
-              {CONV_OPTIONS.map(opt => (
-                <TouchableOpacity
-                  key={opt.key}
-                  style={[s.convTypeBtn, convType === opt.key && s.convTypeBtnActive]}
-                  onPress={() => { setConvType(opt.key); setConvResult(null); setConvValue(''); }}
-                  activeOpacity={0.8}>
-                  <Text style={[s.convTypeBtnText, convType === opt.key && s.convTypeBtnTextActive]}>
-                    {opt.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+        {/* ════════════════════════
+            COST MODE (FIRST)
+        ════════════════════════ */}
+        {mode === 'cost' && (
+          <>
+            <View style={[s.heroBanner, { backgroundColor: T.emeraldBg, borderColor: T.emerald + '40' }]}>
+              <Text style={[s.heroFormula, { color: T.emerald }]}>Cost/m = (GSM × Width × ₹/kg) ÷ 1000</Text>
             </View>
 
-            <InputField
-              label={`Enter ${convOpt.from}`}
-              unit={convOpt.from.substring(0, 3).toUpperCase()}
-              placeholder="e.g. 200"
-              value={convValue}
-              onChangeText={v => { setConvValue(v); setConvResult(null); }}
-            />
-
-            <TouchableOpacity style={s.calcBtn} onPress={doConvert} activeOpacity={0.85}>
-              <Text style={s.calcBtnText}>Convert</Text>
-            </TouchableOpacity>
-          </View>
-
-          {convResult !== null && (
-            <ResultBlock
-              label={`RESULT IN ${convOpt.to.toUpperCase()}`}
-              value={convResult}
-              unit={convOpt.to}
-              accentColor={C.catMedLight}
-              fadeAnim={fadeConv}
-              onShare={shareConv}
-              onReset={resetConv}
-            />
-          )}
-
-          <View style={s.refCard}>
-            <Text style={s.refTitle}>Conversion Factors</Text>
-            {[
-              { from: '1 Meter', to: '1.09361 Yards'  },
-              { from: '1 Yard',  to: '0.9144 Meters'  },
-              { from: '1 GSM',   to: '0.02948 OYS'    },
-              { from: '1 OYS',   to: '33.906 GSM'     },
-            ].map((row, i) => (
-              <View key={i} style={[s.refRow, i % 2 === 0 && s.refRowAlt]}>
-                <Text style={s.refRange}>{row.from}</Text>
-                <Text style={[s.refLabel, { color: C.amber }]}>→  {row.to}</Text>
+            <NeuCard style={s.card}>
+              <View style={s.cardPad}>
+                <Text style={s.cardHead}>Estimate Fabric Cost</Text>
+                <NeuInput label="Fabric GSM"     unitLabel="GSM" placeholder="e.g. 200" value={cGsm} onChangeText={setCGsm} accent={T.emerald} />
+                <NeuInput label="Fabric Width"    unitLabel="M"   placeholder="e.g. 1.5" value={cWd}  onChangeText={setCWd}  accent={T.emerald} />
+                <NeuInput label="Price per kg ₹" unitLabel="₹"   placeholder="e.g. 350" value={cPkg} onChangeText={setCPkg} accent={T.emerald} />
+                <ActionBtn label="Estimate Cost" accent={T.emerald} onPress={doCost} />
               </View>
-            ))}
-          </View>
-        </>
-      )}
+            </NeuCard>
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+            {cRes !== null && (
+              <Animated.View style={{
+                opacity: fadeC,
+                transform: [{ scale: fadeC.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
+              }}>
+                <NeuCard style={s.card}>
+                  <View style={s.cardPad}>
+                    <View style={s.dualRow}>
+                      <StatTile label="Per Linear Meter" value={`₹${cRes.m}`} accent={T.emerald} />
+                      <View style={{ width: 12 }} />
+                      <StatTile label="Per Linear Yard"  value={`₹${cRes.y}`} accent={T.b4} />
+                    </View>
+                    <Div />
+                    <View style={s.recapRow}>
+                      {[{ k:'GSM', v:cGsm }, { k:'Width', v:`${cWd}m` }, { k:'₹/kg', v:`₹${cPkg}` }].map((item, i) => (
+                        <React.Fragment key={item.k}>
+                          {i > 0 && <View style={{ width: 10 }} />}
+                          <View style={[s.miniTile, neu(3)]}>
+                            <Text style={s.miniKey}>{item.k}</Text>
+                            <Text style={[s.miniVal, { color: T.emerald }]}>{item.v}</Text>
+                          </View>
+                        </React.Fragment>
+                      ))}
+                    </View>
+                    <Div />
+                    <View style={[s.noteBox, { backgroundColor: T.emeraldBg, borderColor: T.emerald + '40' }]}>
+                      <Text style={[s.noteTitle, { color: T.emerald }]}>📌 Note</Text>
+                      <Text style={s.noteBody}>
+                        Cost applies to <Text style={{ fontWeight: '800', color: T.ink }}>1 linear meter</Text> at entered width.
+                        Adjust if your supplier's pricing structure differs.
+                      </Text>
+                    </View>
+                    <BtnPair accent={T.emerald} onShare={shareCost} onReset={resetCost} />
+                  </View>
+                </NeuCard>
+              </Animated.View>
+            )}
+
+            <NeuCard style={s.card}>
+              <View style={s.cardPad}>
+                <Text style={s.cardHead}>Formula Reference</Text>
+                {[
+                  { c:'Per Meter', f:'(GSM × Width × Price/kg) ÷ 1000' },
+                  { c:'Per Yard',  f:'Cost/meter × 0.9144'              },
+                ].map((row, i) => (
+                  <View key={i} style={[s.fRow, i % 2 !== 0 && { backgroundColor: 'rgba(255,255,255,0.03)' }]}>
+                    <Text style={s.fCase}>{row.c}</Text>
+                    <Text style={[s.fCode, { color: T.emerald }]}>{row.f}</Text>
+                  </View>
+                ))}
+              </View>
+            </NeuCard>
+          </>
+        )}
+
+        {/* ════════════════════════
+            GSM MODE (SECOND)
+        ════════════════════════ */}
+        {mode === 'gsm' && (
+          <>
+            <View style={[s.heroBanner, { backgroundColor: T.indigoBg, borderColor: T.indigo + '40' }]}>
+              <Text style={[s.heroFormula, { color: T.indigo }]}>GSM  =  Weight (g)  ÷  ( Length × Width )</Text>
+            </View>
+
+            <NeuCard style={s.card}>
+              <View style={s.cardPad}>
+                <Text style={s.cardHead}>Enter Measurements</Text>
+                <NeuInput label="Fabric Weight" unitLabel="G" placeholder="e.g. 250" value={wt} onChangeText={setWt} accent={T.indigo} />
+                <NeuInput label="Fabric Length" unitLabel="M" placeholder="e.g. 1.5" value={ln} onChangeText={setLn} accent={T.indigo} />
+                <NeuInput label="Fabric Width"  unitLabel="M" placeholder="e.g. 1.2" value={wd} onChangeText={setWd} accent={T.indigo} />
+                <ActionBtn label="Calculate GSM" accent={T.indigo} onPress={doGSM} />
+              </View>
+            </NeuCard>
+
+            {gsm !== null && cat && (
+              <Animated.View style={{
+                opacity: fadeG,
+                transform: [{ scale: fadeG.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) }],
+              }}>
+                <NeuCard style={s.card}>
+                  <View style={[s.resultHero, { backgroundColor: cat.bg }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.eyebrow}>GSM VALUE</Text>
+                      <Text style={[s.giantNum, { color: cat.color }]}>{gsm}</Text>
+                      <Text style={[s.giantUnit, { color: cat.color }]}>grams / m²</Text>
+                    </View>
+                    <View style={[s.abbrBox, { backgroundColor: cat.color }, neu(4)]}>
+                      <Text style={s.abbrBoxText}>{cat.abbr}</Text>
+                    </View>
+                  </View>
+                  <View style={s.cardPad}>
+                    <ScaleBar gsm={gsm} color={cat.color} />
+                    <Div />
+                    <View style={[s.catChip, { backgroundColor: cat.bg, borderColor: cat.color + '55' }]}>
+                      <View style={[s.catDot, { backgroundColor: cat.color }]} />
+                      <Text style={[s.catChipText, { color: cat.color }]}>{cat.label}</Text>
+                    </View>
+                    <Text style={s.useLabel}>BEST SUITED FOR</Text>
+                    <Text style={s.useText}>{cat.use}</Text>
+                    <Div />
+                    <View style={s.recapRow}>
+                      {[{ k:'Weight', v:`${wt} g` }, { k:'Length', v:`${ln} m` }, { k:'Width', v:`${wd} m` }].map((item, i) => (
+                        <React.Fragment key={item.k}>
+                          {i > 0 && <View style={{ width: 10 }} />}
+                          <View style={[s.miniTile, neu(3)]}>
+                            <Text style={s.miniKey}>{item.k}</Text>
+                            <Text style={[s.miniVal, { color: T.indigo }]}>{item.v}</Text>
+                          </View>
+                        </React.Fragment>
+                      ))}
+                    </View>
+                    <BtnPair accent={cat.color} onShare={shareGSM} onReset={resetGSM} />
+                  </View>
+                </NeuCard>
+              </Animated.View>
+            )}
+
+            <NeuCard style={s.card}>
+              <View style={s.cardPad}>
+                <Text style={s.cardHead}>GSM Reference Guide</Text>
+                {[
+                  { range:'< 100',   label:'Ultra Light', eg:'Chiffon, Voile',     color:T.b1 },
+                  { range:'100–149', label:'Light',        eg:'Sarees, Linings',   color:T.b2 },
+                  { range:'150–199', label:'Medium Light', eg:'Shirts, Kurtas',    color:T.b3 },
+                  { range:'200–249', label:'Medium',       eg:'Trousers, Jackets', color:T.b4 },
+                  { range:'250–349', label:'Heavy',        eg:'Denim, Canvas',     color:T.b5 },
+                  { range:'350+',    label:'Very Heavy',   eg:'Industrial',        color:T.b6 },
+                ].map((r, i) => <RefRow key={i} {...r} alt={i % 2 !== 0} />)}
+              </View>
+            </NeuCard>
+          </>
+        )}
+
+        <View style={s.footer}>
+          <Text style={s.footerBrand}>TexMetrics Pro</Text>
+          <Text style={s.footerTagline}>Precision Textile & GSM Intelligence</Text>
+        </View>
+        <View style={{ height: 30 }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── STYLES ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: C.pageBg },
+  root:          { flex: 1, backgroundColor: BASE },
+  scroll:        { flex: 1 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 40 },
 
-  // Header
-  header:   { backgroundColor: C.navy, paddingTop: 56, paddingBottom: 36, alignItems: 'center' },
-  iconBox:  { width: 72, height: 72, borderRadius: 20, backgroundColor: C.navyMid, alignItems: 'center', justifyContent: 'center', marginBottom: 16, borderWidth: 2, borderColor: C.navyLight },
-  iconText: { color: C.amber, fontSize: 18, fontWeight: '900', letterSpacing: 1 },
-  title:    { fontSize: 30, fontWeight: '800', color: C.textWhite, letterSpacing: 0.5 },
-  subtitle: { fontSize: 12, color: C.amber, fontWeight: '600', letterSpacing: 4, marginTop: 4 },
+  // ── Header ──
+  header: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'android' ? 14 : 8,
+    paddingBottom: 14,
+    backgroundColor: BASE,
+  },
+  headerIcon:     { width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  headerIconText: { fontSize: 19, color: '#0B132B', fontWeight: '900' },
+  headerTextWrap: { flex: 1 },
+  headerTitle:    { fontSize: 18, fontWeight: '900', color: T.ink, letterSpacing: 0.2 },
+  headerSub:      { fontSize: 10, fontWeight: '800', letterSpacing: 2.5, marginTop: 1 },
+  formulaChip:    { borderRadius: 99, borderWidth: 1.5, paddingHorizontal: 11, paddingVertical: 6 },
+  formulaChipText:{ fontSize: 10, fontWeight: '800', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
 
-  // Formula strip
-  formulaStrip: { backgroundColor: C.navyMid, paddingVertical: 10, alignItems: 'center' },
-  formulaText:  { fontSize: 12, color: C.amber, fontFamily: 'monospace' },
+  // ── Tab bar ──
+  tabWrap: { paddingHorizontal: 16, paddingBottom: 12 },
+  tabBar: {
+    flexDirection: 'row', backgroundColor: BASE_LIGHT,
+    borderRadius: 20, padding: 5,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)',
+  },
+  tabItem:       { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 15, borderWidth: 1, borderColor: 'transparent' },
+  tabItemActive: { },
+  tabIcon:       { fontSize: 15, marginBottom: 3 },
+  tabLabel:      { fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.4 },
 
-  // Mode toggle
-  modeRow:           { flexDirection: 'row', margin: 16, marginBottom: 0, backgroundColor: C.navyMid, borderRadius: 12, padding: 4 },
-  modeBtn:           { flex: 1, paddingVertical: 9, alignItems: 'center', borderRadius: 10 },
-  modeBtnActive:     { backgroundColor: C.amber },
-  modeBtnText:       { fontSize: 11, fontWeight: '700', color: C.textMuted },
-  modeBtnTextActive: { color: C.navy },
+  // ── Hero banner ──
+  heroBanner: {
+    borderRadius: 16, borderWidth: 1.5,
+    paddingVertical: 12, paddingHorizontal: 16,
+    alignItems: 'center', marginBottom: 14,
+  },
+  heroFormula: {
+    fontSize: 12, fontWeight: '800', textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', letterSpacing: 0.3,
+  },
 
-  // Cards
-  card:      { backgroundColor: C.cardBg, margin: 16, borderRadius: 16, padding: 20, elevation: 3, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: C.textPrimary, marginBottom: 20 },
+  // ── Card layout ──
+  card:    { marginBottom: 16, overflow: 'hidden' },
+  cardPad: { padding: 20 },
+  cardHead:{ fontSize: 15, fontWeight: '900', color: T.ink, marginBottom: 18, letterSpacing: 0.2 },
 
-  // Hint
-  hint:     { fontSize: 13, color: C.textSecondary, lineHeight: 20, marginBottom: 20, backgroundColor: '#FFFBEB', padding: 12, borderRadius: 10, borderLeftWidth: 3, borderLeftColor: C.amber },
-  hintBold: { fontWeight: '700', color: C.amber },
+  // ── Result hero ──
+  resultHero: { flexDirection: 'row', alignItems: 'center', padding: 20, paddingBottom: 16 },
+  eyebrow:    { fontSize: 10, fontWeight: '800', color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 },
+  giantNum:   { fontSize: 68, fontWeight: '900', lineHeight: 74, letterSpacing: -2 },
+  giantUnit:  { fontSize: 13, fontWeight: '600', marginTop: 2, color: T.inkSoft },
+  abbrBox:    { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
+  abbrBoxText:{ color: '#0B132B', fontSize: 15, fontWeight: '900', letterSpacing: 0.5 },
 
-  // Calculate button
-  calcBtn:     { backgroundColor: C.btnPrimary, borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 8, elevation: 2 },
-  calcBtnText: { color: C.amber, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+  // ── Category chip ──
+  catChip:    { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 99, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 14 },
+  catDot:     { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
+  catChipText:{ fontSize: 13, fontWeight: '800' },
 
-  // Result card
-  resultCard:   { backgroundColor: C.cardBg, marginHorizontal: 16, marginBottom: 16, borderRadius: 16, overflow: 'hidden', elevation: 4, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 10 },
-  resultAccent: { height: 4 },
-  resultTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, paddingBottom: 0 },
-  gsmMeta:      { fontSize: 11, color: C.textMuted, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase' },
-  gsmValue:     { fontSize: 48, fontWeight: '800', color: C.textPrimary, marginTop: 2 },
-  gsmUnit:      { fontSize: 18, color: C.textSecondary, fontWeight: '400' },
-  abbrCircle:   { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  abbrText:     { fontSize: 15, fontWeight: '900', letterSpacing: 1 },
-  divider:      { height: 1, backgroundColor: C.pageBg, marginHorizontal: 20, marginVertical: 16 },
+  // ── Detail text ──
+  useLabel: { fontSize: 10, fontWeight: '800', color: T.inkGhost, textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: 6 },
+  useText:  { fontSize: 14, fontWeight: '500', color: T.inkMid, lineHeight: 21 },
 
-  // Chip
-  chipRow:  { paddingHorizontal: 20, marginBottom: 8 },
-  chip:     { alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, borderWidth: 1.5 },
-  chipText: { fontSize: 13, fontWeight: '700' },
+  // ── Recap row ──
+  recapRow: { flexDirection: 'row' },
+  miniTile: { flex: 1, backgroundColor: BASE, borderRadius: 13, paddingVertical: 11, paddingHorizontal: 8, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  miniKey:  { fontSize: 9, fontWeight: '800', color: T.inkGhost, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 5 },
+  miniVal:  { fontSize: 15, fontWeight: '900' },
 
-  useLabel: { fontSize: 11, color: C.textMuted, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 20, marginTop: 4 },
-  useText:  { fontSize: 14, color: C.textSecondary, paddingHorizontal: 20, marginTop: 4, lineHeight: 22 },
+  // ── Dual stat row ──
+  dualRow: { flexDirection: 'row' },
 
-  // Action buttons
-  actionRow:    { flexDirection: 'row', gap: 10, margin: 16 },
-  copyBtn:      { flex: 1, backgroundColor: C.btnCopy, padding: 13, borderRadius: 10, alignItems: 'center' },
-  copyBtnText:  { color: C.amber, fontWeight: '700', fontSize: 14 },
-  resetBtn:     { flex: 1, backgroundColor: C.btnReset, padding: 13, borderRadius: 10, alignItems: 'center', borderWidth: 1, borderColor: C.btnResetBorder },
-  resetBtnText: { color: C.btnResetText, fontWeight: '700', fontSize: 14 },
+  // ── Note box ──
+  noteBox:   { borderRadius: 14, borderWidth: 1.5, padding: 14 },
+  noteTitle: { fontSize: 12, fontWeight: '800', marginBottom: 5 },
+  noteBody:  { fontSize: 13, color: T.inkMid, lineHeight: 19 },
 
-  // Reference table
-  refCard:   { backgroundColor: C.cardBg, marginHorizontal: 16, marginBottom: 16, borderRadius: 16, padding: 20, elevation: 2 },
-  refTitle:  { fontSize: 14, fontWeight: '700', color: C.textPrimary, marginBottom: 14 },
-  refRow:    { flexDirection: 'row', paddingVertical: 8, paddingHorizontal: 4, borderRadius: 8 },
-  refRowAlt: { backgroundColor: C.pageBg },
-  refRange:  { width: 90, fontSize: 12, color: C.amber, fontWeight: '700', fontFamily: 'monospace' },
-  refLabel:  { flex: 1, fontSize: 12, color: C.textPrimary, fontWeight: '600' },
-  refEg:     { flex: 1, fontSize: 12, color: C.textMuted, textAlign: 'right' },
+  // ── Formula rows ──
+  fRow:  { paddingVertical: 12, paddingHorizontal: 10, borderRadius: 10, marginBottom: 2 },
+  fCase: { fontSize: 10, fontWeight: '800', color: T.inkSoft, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 5 },
+  fCode: { fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', lineHeight: 20 },
 
-  // Convert type selector
-  convTypeRow:           { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  convTypeBtn:           { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, backgroundColor: C.inputBg, borderWidth: 1.5, borderColor: C.inputBorder },
-  convTypeBtnActive:     { backgroundColor: C.navyMid, borderColor: C.amber },
-  convTypeBtnText:       { fontSize: 12, fontWeight: '700', color: C.textMuted },
-  convTypeBtnTextActive: { color: C.amber },
-
-  // Assumption box
-  assumptionBox:   { backgroundColor: '#F0FDF4', borderRadius: 10, padding: 12, marginTop: 12, borderLeftWidth: 3, borderLeftColor: C.catLight },
-  assumptionTitle: { fontSize: 12, fontWeight: '700', color: '#166534', marginBottom: 4 },
-  assumptionText:  { fontSize: 12, color: '#15803D', lineHeight: 18 },
+  // ── Footer ──
+  footer: { alignItems: 'center', marginTop: 16, marginBottom: 12 },
+  footerBrand: { fontSize: 14, fontWeight: '900', color: T.inkSoft, letterSpacing: 1 },
+  footerTagline: { fontSize: 11, fontWeight: '600', color: T.inkGhost, marginTop: 2, letterSpacing: 0.3 },
 });

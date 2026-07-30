@@ -15,8 +15,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-               BuildableName = "FabricGSM.app"
-               BlueprintName = "FabricGSM"
+               BuildableName = "TexMetricsPro.app"
+               BlueprintName = "TexMetricsPro"
                ReferencedContainer = "container:FabricGSM.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
@@ -33,8 +33,8 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
-               BuildableName = "FabricGSMTests.xctest"
-               BlueprintName = "FabricGSMTests"
+               BuildableName = "TexMetricsProTests.xctest"
+               BlueprintName = "TexMetricsProTests"
                ReferencedContainer = "container:FabricGSM.xcodeproj">
             </BuildableReference>
          </TestableReference>
@@ -55,8 +55,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "FabricGSM.app"
-            BlueprintName = "FabricGSM"
+            BuildableName = "TexMetricsPro.app"
+            BlueprintName = "TexMetricsPro"
             ReferencedContainer = "container:FabricGSM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
@@ -72,8 +72,8 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
-            BuildableName = "FabricGSM.app"
-            BlueprintName = "FabricGSM"
+            BuildableName = "TexMetricsPro.app"
+            BlueprintName = "TexMetricsPro"
             ReferencedContainer = "container:FabricGSM.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>

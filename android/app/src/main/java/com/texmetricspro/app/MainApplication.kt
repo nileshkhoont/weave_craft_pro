@@ -1,4 +1,4 @@
-package com.garokik.gsmfabriccal
+package com.texmetricspro.app
 
 import android.app.Application
 import com.facebook.react.PackageList
