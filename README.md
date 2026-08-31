@@ -1,57 +1,28 @@
-# TexMetrics Pro - Precision Textile & GSM Intelligence Suite
+# WeaveCraft Pro
 
-![TexMetrics Pro Logo](https://img.shields.io/badge/Brand-TexMetrics%20Pro-2563EB?style=for-the-badge)
-![React Native](https://img.shields.io/badge/React%20Native-0.84.0-61DAFB?style=for-the-badge&logo=react)
-![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20iOS-3DDC84?style=for-the-badge)
+**WeaveCraft Pro** is a high-precision textile calculation and fabric analytics suite built for apparel manufacturers, fashion designers, textile mills, tailors, garment exporters, and fabric buyers.
 
-**TexMetrics Pro** is a modern, high-precision textile calculation and fabric analytics suite built for apparel manufacturers, fashion designers, textile mills, tailors, and fabric buyers.
+## 🌟 Key Features
 
----
+- **Fabric Cost Estimator**: Calculate cost per linear meter and per linear yard based on fabric GSM, width, and price per kg.
+- **GSM Calculator**: High-precision Grams per Square Meter (g/m²) calculation with weight, length, and width parameters.
+- **Automatic Category Classification**: Instant classification into Ultra Light (<100), Light (100-149), Medium Light (150-199), Medium (200-249), Heavy (250-349), and Very Heavy (350+).
+- **Formula Reference Guide**: Built-in reference cards for standard textile formulas.
+- **Emerald Obsidian Theme**: High-contrast, glassmorphic dark theme engineered for clear visibility in mills and workshops.
+- **100% Private & Local**: All calculations are processed on-device.
 
-## ✨ Features
+## 📐 Formulas Used
 
-- 📐 **Fabric GSM Calculator**: Calculate Grams per Square Meter ($g/m^2$) instantly from Weight ($g$), Length ($m$), and Width ($m$). Includes automatic textile classification (Ultra Light, Light, Medium, Heavy, Very Heavy).
-- 💰 **Fabric Cost Estimator**: Calculate exact fabric costs per linear meter and per linear yard based on yarn/fabric price per kilogram.
-- 🎨 **Neumorphic Visual Identity**: Sleek slate aesthetic with electric sapphire, emerald velvet, and amethyst silk accents.
-- 📤 **Shareable Reports**: Instant formatted report generation for quick sharing with suppliers and team members.
+- **GSM** = Weight (g) ÷ (Length (m) × Width (m))
+- **Cost per Meter** = (GSM × Width (m) × Price/kg) ÷ 1000
+- **Cost per Yard** = Cost per Meter × 0.9144
 
----
+## 🚀 Getting Started
 
-## 🚀 Quick Start
-
-### 1. Install Dependencies
 ```bash
+# Install dependencies
 npm install
+
+# Run Android dev server
+npm run android
 ```
-
-### 2. Start Metro Bundler
-```bash
-npm start
-```
-
-### 3. Build & Run
-- **Android**:
-  ```bash
-  npm run android
-  ```
-- **iOS** *(macOS only)*:
-  ```bash
-  cd ios && bundle exec pod install && cd ..
-  npm run ios
-  ```
-
----
-
-## 📐 Key Formulas
-
-| Calculator | Formula |
-| :--- | :--- |
-| **GSM** | $\text{GSM} = \frac{\text{Weight (g)}}{\text{Length (m)} \times \text{Width (m)}}$ |
-| **Reverse Width** | $\text{Width} = \frac{\text{Weight (g)}}{\text{GSM} \times \text{Length (m)}}$ |
-| **Cost per Meter** | $\text{Cost/m} = \frac{\text{GSM} \times \text{Width (m)} \times \text{Price/kg}}{1000}$ |
-| **Cost per Yard** | $\text{Cost/yd} = \text{Cost/m} \times 0.9144$ |
-
----
-
-## 🛡 License
-Internal / Proprietary Software. All rights reserved.
